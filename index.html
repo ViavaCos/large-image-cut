@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>large-image-cut</title>
+</head>
+<body>
+
+  <input type="file" name="img" id="imgUpload" onchange="handleFileChange(this)">
+
+  <script>
+    const oneMB = 1 * 1024 * 1024;
+    const baseURL = "http://localhost:3000"
+    const FormDataContentType = "multipart/form-data"
+    const JsonContentType = "application/json"
+
+    /**
+     * 上传文件变更
+     */
+    function handleFileChange(event) {
+      const file = event.files[0];
+
+      if(!file) return;
+
+      const chunkFiles = getchunkFiles(file)
+      const uuid = getUUID();
+
+      const fetchList = chunkFiles.map((i, idx) => {
+        const fd = new FormData()
+        fd.append('chunk', i.partImg)
+        fd.append('index', idx);
+        fd.append('uuid', uuid)
+
+        return simpleFetch({
+          url: '/upload/part',
+          method:  "POST",
+          params: fd,
+          isFormDate: true,
+          uuid,
+        })
+      })
+
+      let isUploadFailed = false; // 是否上传失败
+
+      Promise.all(fetchList).catch(err => {
+        isUploadFailed = true;
+        console.log(err);
+      }).finally(() => {
+        !isUploadFailed && simpleFetch({
+          url: '/upload/part/merge',
+          method:  "POST",
+          params: { uuid, name: file.name },
+        })
+      })
+    }
+
+    /**
+     * 获取切片文件数据
+     */
+    function getchunkFiles (file) {
+      const result = [];
+      if(!file) return result;
+
+      let loopCount = Math.ceil(file.size / oneMB);
+      let start = 0;
+      let end = oneMB;
+
+      while (loopCount) {
+        result.push({
+          partImg: file.slice(start, end),
+        })
+
+        start = end;
+        end = start + oneMB;
+        loopCount--;
+      }
+
+      return result
+    }
+
+    /**
+     * 获取唯一id
+     */
+    function getUUID () {
+      return `${Date.now()}${getRandomByRange(1, 1000)}${getRandomByRange(1, 1000)}`
+    }
+
+    /**
+     * 根据范围获取随机数字
+     */
+    function getRandomByRange(min, max) {
+      return Math.round(Math.random() * (max - min)) + min;
+    }
+
+    /**
+     * 简易fetch封装
+     */
+    const simpleFetch = async ({ url, method, params, contentType, uuid, isFormDate = false }) => {
+      const fetchConfig = {
+        method,
+        mode: "cors",
+        body: params
+      }
+
+      if(!isFormDate) {
+        fetchConfig.headers = {
+          "Content-Type": contentType || JsonContentType,
+        }
+      }
+
+      if(uuid) {
+        fetchConfig.headers = {
+          ...(fetchConfig.headers || {}),
+          uuid,
+        }
+      }
+
+      if(fetchConfig.headers['Content-Type'] === JsonContentType) {
+        fetchConfig.body = JSON.stringify(fetchConfig.body)
+      }
+      
+      const response = await fetch(baseURL + url, fetchConfig)
+      return response.json();
+    }
+  </script>
+
+  <!-- 手动测试 -->
+  <!-- <button onclick="test()">Test</button>
+  <script>
+    function test(){
+      simpleFetch({
+        url: '/upload/part/merge',
+        method:  "POST",
+        params: { uuid: '1711447385818421128', name: "CC.png" },
+      })
+    }
+  </script> -->
+</body>
+</html>
