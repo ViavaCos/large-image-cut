@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>large_image_preview</title>
+</head>
+<body>
+
+  <img id="test" src="./test_assets/placeholder.png">
+
+  <script>
+    function resizeImg(imgUrl, maxWidth, maxHeight, callback) {
+      let img = new Image();
+
+      img.src = imgUrl
+      img.onload = function() {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext("2d")
+
+        let widthRatio = img.width / maxWidth
+        let heightRatio = img.height / maxHeight
+        let ratio = Math.max(widthRatio, heightRatio)
+        let newWidth = img.width / ratio
+        let newHeight = img.height / ratio
+
+        canvas.width = newWidth
+        canvas.height = newHeight
+
+        ctx.imageSmoothingEnabled = true; // 抗锯齿
+        ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, newWidth, newHeight)
+
+        const imageDataUrl = canvas.toDataURL()
+        if(callback) {
+          callback(imageDataUrl)
+        }
+      }
+    }
+
+    function updateUrl(realUrl, wrapSelector){
+      const wrap = document.querySelector(wrapSelector);
+      if(!wrap) return;
+
+      resizeImg(realUrl, 400, 300, (base64) => {
+        wrap.src = base64
+      })
+    }
+    updateUrl('./test_assets/CC.png', '#test')
+  </script>
+  
+</body>
+</html>
